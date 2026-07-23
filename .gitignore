@@ -22,5 +22,8 @@ database/data-asli/
 *.xlsx
 *.csv
 
+# Original workflow with real credentials (use workflow/chatbot-akademik.json instead)
+BesokSidang.json
+
 # Logs
 *.log

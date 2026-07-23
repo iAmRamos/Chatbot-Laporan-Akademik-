@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - skripsi-net
+
+  n8n:
+    image: n8nio/n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Jakarta
+      - TZ=Asia/Jakarta
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - N8N_PROXY_HOPS=1
+      - N8N_COMMUNITY_PACKAGES_ALLOW=true
+      - N8N_EDITOR_BASE_URL=${NGROK_URL}
+      - WEBHOOK_URL=${NGROK_URL}
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_botai:/home/node/.n8n
+    networks:
+      - skripsi-net
+    depends_on:
+      - postgres
+
+networks:
+  skripsi-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  n8n_botai:
+    external: true

@@ -20,7 +20,8 @@ Sebelumnya, penyampaian informasi akademik di SDN 04 Rawang Kota Pariaman dilaku
 | 📋 **Nilai Sumatif Akhir Semester** | Rekap nilai akhir semester |
 | 🗓️ **Jadwal Pelajaran** | Jadwal pelajaran harian per kelas |
 | 📌 **Rekap Absensi** | Data kehadiran siswa |
-| 🤖 **Analisis AI** | Ringkasan naratif perkembangan akademik siswa berbasis OpenAI |
+| 🤖 **Analisis AI** | Ringkasan naratif perkembangan akademik siswa berbasis Google Gemini |
+| 💬 **AI Chat** | Obrolan bebas dengan "Pak Ceria" untuk motivasi dan panduan belajar |
 | ❓ **Bantuan (Help)** | Panduan penggunaan chatbot |
 | 🚪 **Logout** | Keluar dari sesi aktif |
 
@@ -35,7 +36,7 @@ Wali Murid (Telegram)
   Telegram Bot API
         │
         ▼
-    n8n Workflow  ──────────► OpenAI API (Analisis AI)
+    n8n Workflow  ──────────► Google Gemini API (Analisis AI)
         │
         ▼
   Google Sheets (Database)
@@ -45,7 +46,7 @@ Wali Murid (Telegram)
 1. Wali murid kirim perintah via Telegram
 2. Telegram Bot API meneruskan ke n8n webhook
 3. n8n memproses request, query data ke Google Sheets
-4. Untuk fitur analisis: n8n memanggil OpenAI API
+4. Untuk fitur analisis: n8n memanggil Google Gemini API
 5. Respons dikirim balik ke pengguna via Telegram
 
 ---
@@ -57,7 +58,7 @@ Wali Murid (Telegram)
 | Chatbot Platform | [Telegram Bot API](https://core.telegram.org/bots/api) |
 | Workflow Automation | [n8n](https://n8n.io/) |
 | Database | [Google Sheets](https://sheets.google.com) + Google Sheets API |
-| AI Analysis | [OpenAI API](https://openai.com/api/) |
+| AI Analysis | [Google Gemini API](https://ai.google.dev/) |
 | Containerization | [Docker](https://docker.com) |
 | Tunneling (dev) | [Ngrok](https://ngrok.com) |
 | Scripting | JavaScript (n8n Function Node) |
@@ -67,11 +68,11 @@ Wali Murid (Telegram)
 ## ⚙️ Instalasi & Konfigurasi
 
 ### Prasyarat
-- Docker Desktop terinstall
-- Akun Ngrok (untuk development/lokal)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) terinstall
+- Akun [Ngrok](https://ngrok.com) (untuk tunneling lokal ke internet)
 - Akun Telegram & Bot Token (dari [@BotFather](https://t.me/BotFather))
 - Google Account + Google Sheets API aktif
-- OpenAI API Key
+- Google Gemini API Key
 
 ### 1. Clone Repository
 ```bash
@@ -88,43 +89,50 @@ cp .env.example .env
 Isi nilai berikut di `.env`:
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-OPENAI_API_KEY=your_openai_api_key
+GOOGLE_GEMINI_API_KEY=your_google_gemini_api_key
 GOOGLE_SHEET_ID=your_google_sheet_id
-NGROK_AUTHTOKEN=your_ngrok_authtoken
-N8N_BASIC_AUTH_USER=admin
-N8N_BASIC_AUTH_PASSWORD=your_password
+NGROK_URL=https://xxxx.ngrok-free.app/
+POSTGRES_USER=chatbot
+POSTGRES_PASSWORD=your_db_password
+POSTGRES_DB=db_sekolah
 ```
 
-### 3. Jalankan n8n via Docker
+### 3. Jalankan Ngrok
+Jalankan ngrok untuk expose port n8n ke internet:
+```bash
+ngrok http 5678
+```
+Salin URL HTTPS yang muncul (contoh: `https://xxxx.ngrok-free.app`) → masukkan ke `NGROK_URL` di file `.env`
+
+> ⚠️ URL ngrok berubah setiap kali dijalankan ulang. Update `.env` dan restart Docker setiap kali URL berubah.
+
+### 4. Jalankan Docker
 ```bash
 docker compose up -d
 ```
 
-n8n akan berjalan di `http://localhost:5678`
-
-### 4. Setup Ngrok (untuk development)
-```bash
-ngrok http 5678
-```
-Salin URL HTTPS yang diberikan ngrok (contoh: `https://xxxx.ngrok.io`)
+Layanan yang berjalan:
+| Layanan | URL |
+|---------|-----|
+| n8n | `http://localhost:5678` |
+| PostgreSQL | `localhost:5432` |
 
 ### 5. Import Workflow n8n
 1. Buka `http://localhost:5678`
-2. Login dengan kredensial yang sudah dikonfigurasi
+2. Login ke dashboard n8n
 3. Klik **Import** → pilih file `workflow/chatbot-akademik.json`
-4. Update webhook URL dengan URL ngrok kamu
-5. Aktifkan workflow
+4. Aktifkan workflow (toggle di pojok kanan atas)
 
 ### 6. Setup Google Sheets
 1. Buat Google Sheet baru
-2. Gunakan template struktur sheet dari folder `database/`
-3. Aktifkan Google Sheets API di Google Cloud Console
-4. Hubungkan credentials di n8n → Credentials → Google Sheets
+2. Gunakan struktur dari folder `database/`
+3. Aktifkan Google Sheets API di [Google Cloud Console](https://console.cloud.google.com)
+4. Hubungkan credentials di n8n → **Credentials** → **Google Sheets OAuth2**
 
 ### 7. Daftarkan Webhook Telegram
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-     -d "url=https://xxxx.ngrok.io/webhook/telegram"
+     -d "url=https://xxxx.ngrok-free.app/webhook/telegram"
 ```
 
 ---
@@ -165,12 +173,15 @@ chatbot-akademik-telegram/
 
 | Sheet | Kolom Utama |
 |-------|-------------|
-| `DataPengguna` | telegram_id, nama, kelas, nama_siswa |
-| `NilaiFormatif` | telegram_id, mata_pelajaran, nilai, tanggal |
-| `NilaiSumatifMateri` | telegram_id, mata_pelajaran, materi, nilai |
-| `NilaiSumatifSemester` | telegram_id, mata_pelajaran, semester, nilai |
-| `Absensi` | telegram_id, tanggal, status (hadir/sakit/izin/alpha) |
-| `Jadwal` | kelas, hari, jam, mata_pelajaran, guru |
+| `DataPengguna` | Telegramid, Nama, Nisn, Password, Kelas |
+| `NilaiAkhir_DB` | Nisn, Mapel, Nilai |
+| `Absensi_DB` | Nisn, Sakit, Izin, Alpha, catatan |
+| `Jadwal_DB` | Kelas, Hari, Mapel |
+| `NilaiFormatif_DB` | Nisn, Mapel, Tp, Nilai |
+| `NilaiSumatifMateri_DB` | Nisn, Mapel, Tp, Nilai |
+| `NilaiSumatifSemester_DB` | Nisn, Mapel, Tp, Nilai |
+| `TujuanPembelajaran_DB` | Kelas, Mapel, Tp, Deskripsi |
+| `RataRata_DB` | Kelas, Mapel, RataRata |
 
 > ⚠️ **Catatan:** Template sheet berisi data dummy. Data siswa asli tidak disertakan dalam repository ini demi menjaga privasi.
 
@@ -197,9 +208,6 @@ Hasil pengujian: **Semua fitur berjalan sesuai spesifikasi** ✅
 Penelitian ini merupakan Tugas Akhir (Skripsi) Program Studi Sistem Informasi, Fakultas Ilmu Komputer, Universitas Putra Indonesia "YPTK" Padang, 2026.
 
 - **Penulis:** Ramos Raymond Dasril
-- **Pembimbing I:** Dr. Syafrika Deni Rizki, S.Kom., M.Kom
-- **Pembimbing II:** Rofil M. Nur, S.Kom., M.Kom
-
 ---
 
 ## 📄 Lisensi

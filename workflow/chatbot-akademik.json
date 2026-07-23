@@ -1,0 +1,3228 @@
+{
+  "name": "Pelayanan1",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3328,
+        1408
+      ],
+      "id": "2e30e07b-3a9d-4899-a375-b647f68e45a1",
+      "name": "Telegram Trigger",
+      "webhookId": "1251fdf2-ae83-4fee-a4e5-9cecc621949e",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Telegramid",
+              "lookupValue": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2640,
+        1376
+      ],
+      "id": "37a93056-ca24-437e-afa7-c551d17442ec",
+      "name": "CheckIDTelegram",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6bd91197-2c57-4656-93b1-a77e112359e9",
+              "leftValue": "={{ $json.Nisn }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2416,
+        1328
+      ],
+      "id": "bebc2fdd-9c5c-4d08-8202-3231ba7073cd",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Peran: Kamu adalah \"Pak Ceria\", guru SD yang bijak, ramah, dan memotivasi.\n\nTugas: Baca data nilai siswa dan bandingkan dengan rata-rata kelas.\nJika Average Mapel = 0 Jangan Disebutkan Mapelnya\n\nJika nilai siswa DI ATAS rata-rata: Puji dia! \"Wah, nilai Matematika kamu hebat, di atas rata-rata teman sekelas lho!\"\n\nJika nilai siswa DI BAWAH rata-rata: Beri semangat halus. \"Nilai IPAS kamu sedikit di bawah rata-rata kelas, ayo belajar lebih giat lagi ya nak!\"\n\nJANGAN sebutkan angka rata-rata secara kaku (misal: \"Rata-rata adalah 80\"). Gunakan bahasa percakapan saja.\n\n\nTutup dengan emoji semangat(Pastikan Emoji Tersedia Di Telegram).\n\nData: {{ $json.text_laporan }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        192,
+        624
+      ],
+      "id": "f379ac0d-1683-42d9-b0f8-191e7afff11b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FORMATTER LAPORAN KEHADIRAN (DATABASE VERSION)\n\n// 1. Ambil Data Absensi\nlet data;\n\ntry {\n  data = $input.first().json;\n} catch (e) {\n  return { json: { text: \"\u26a0\ufe0f Data kehadiran tidak ditemukan. Pastikan data tersedia.\" } };\n}\n\n// 2. Ambil Identitas dari node login (CheckIDTelegram)\nconst user = $('CheckIDTelegram').first().json;\n\nconst nama = user['Nama'] || 'Siswa';\nconst nisn = user['Nisn'] || '-';\n\n// 3. Ambil angka absensi\nconst s = parseInt(data['Sakit']) || 0;\nconst i = parseInt(data['Izin']) || 0;\nconst a = parseInt(data['Alpha']) || 0;\n\n// Jika belum ada catatan di database\nconst catatan = data['catatan'] || '-';\n\n// Hitung total absen\nconst total = s + i + a;\n\n// Status kehadiran\nlet status = \"\u2705 AMAN\";\nif (total > 5) status = \"\u26a0\ufe0f WASPADA (Sering Absen)\";\nif (total > 10) status = \"\ud83d\udea8 BAHAYA (Panggilan Orang Tua)\";\n\n// 4. Susun pesan\nlet pesan = `\ud83d\udcc5 *LAPORAN KEHADIRAN SISWA*\\n`;\npesan += `Nama: ${nama}\\n`;\npesan += `NISN: ${nisn}\\n`;\npesan += `---------------------------\\n\\n`;\n\npesan += `\ud83d\udcca *Rincian Absensi:*\\n`;\npesan += `\ud83e\udd12 Sakit  : ${s} hari\\n`;\npesan += `\u2709\ufe0f Izin   : ${i} hari\\n`;\npesan += `\u274c Alpha  : ${a} hari\\n`;\npesan += `---------------------------\\n`;\npesan += `\u2211 *TOTAL ABSEN : ${total} HARI*\\n`;\npesan += `Status: ${status}\\n\\n`;\n\npesan += `\ud83d\udcdd *Catatan Wali Kelas:*\\n`;\npesan += `\"${catatan}\"`;\n\n// 5. Output ke Telegram\nreturn {\n  json: {\n    text: pesan\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        1456
+      ],
+      "id": "262c0d83-62c7-47f3-af3c-b2389d5d989f",
+      "name": "Convert utk absensi"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Nisn",
+              "lookupValue": "={{ $json.nisn_input }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2496,
+        1904
+      ],
+      "id": "d05690a1-6688-4079-b91b-e5e25cd6cc67",
+      "name": "DataPengguna",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "263f1772-c48f-4d6a-bf14-457f713900b4",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "#",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notContains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "#",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "a30340e8-a8d6-460b-b2c5-81f2cbf8b523"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2896,
+        1408
+      ],
+      "id": "a838155b-49e2-4680-a9eb-9891a7f6570d",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/analisis",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "201794a3-91a2-4cb9-bac6-7e6ff16c6ef6"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5f3350a4-0733-4e38-889a-3bf9886bad24",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/nilai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7d40d058-eef7-49b4-9311-623b12b2c26f",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/absensi",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "bfcf6947-c5b1-4736-9023-c792e40e1d8d",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/jadwal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8bc027ce-f39c-4037-98c5-027b9526dd81",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8eb11bc8-9ea2-4717-83d3-65701473311c",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9fae7309-baec-49f3-aed5-129c1b6971a9",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/logout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5dffd826-455a-4646-82ff-ed653cf706ae",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/formatif",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7fddef65-58a5-4278-a7a1-17ff9473dc96",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/sumatifmateri",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9ee57a14-6ead-4b8e-9071-ea7ee5c493a4",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+                    "rightValue": "/sumatifsemester",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "840ca250-6490-4064-8bb6-300335e65f36",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1120,
+        1184
+      ],
+      "id": "2352bd67-6015-46cd-82f2-495406d25c3b",
+      "name": "FilterPerintah"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==============================\n// CODE NODE JADWAL (DATABASE)\n// ==============================\n\n// 1. Ambil semua data jadwal\nconst allJadwal = $input.all().map(i => i.json);\n\nif (!allJadwal.length) {\n  return { json: { text: \"\u26a0\ufe0f Data jadwal kosong.\" } };\n}\n\n// 2. Ambil data user\nconst telegramData = $('Telegram Trigger').first().json;\nconst userData = $('CheckIDTelegram').first().json;\n\nconst telegramid = telegramData.message.chat.id;\nconst namaSiswa = userData.Nama || \"Siswa\";\n\n// Bersihkan kelas user \u2192 \"Kelas 5\" jadi \"5\"\nconst userKelas = String(userData.Kelas)\n  .replace(/kelas/i, '')\n  .replace(/\\s/g, '')\n  .trim();\n\n// 3. Filter jadwal berdasarkan kelas\nconst jadwalKelas = allJadwal.filter(row => {\n\n  const kelasRow = String(row.Kelas || '')\n    .replace(/kelas/i, '')\n    .replace(/\\s/g, '')\n    .trim();\n\n  return kelasRow === userKelas;\n});\n\n// 4. Urutkan hari\nconst skorHari = {\n  senin:1,\n  selasa:2,\n  rabu:3,\n  kamis:4,\n  jumat:5,\n  sabtu:6,\n  minggu:7\n};\n\njadwalKelas.sort((a, b) => {\n  const hariA = (a.Hari || '').toLowerCase().trim();\n  const hariB = (b.Hari || '').toLowerCase().trim();\n  return (skorHari[hariA] || 99) - (skorHari[hariB] || 99);\n});\n\n// 5. Format pesan\nlet pesan =\n`\ud83d\udcc5 *JADWAL MINGGUAN*\nHalo ${namaSiswa} \ud83d\udc4b\nKelas ${userKelas}\n========================\n`;\n\nlet lastDay = '';\n\njadwalKelas.forEach(item => {\n\n  const hari = (item.Hari || '').trim().toUpperCase();\n\n  if (hari !== lastDay) {\n    pesan += `\\n\ud83d\udd3b *${hari}*\\n`;\n    lastDay = hari;\n  }\n\n  pesan += `\ud83d\udcda ${item.Mapel}\\n`;\n});\n\n// Jika tidak ditemukan\nif (!jadwalKelas.length) {\n  pesan = `\u26a0\ufe0f Jadwal kelas ${userKelas} tidak ditemukan.`;\n}\n\n// 6. Output ke Telegram\nreturn {\n  json: {\n    text: pesan,\n    telegramid\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        1744
+      ],
+      "id": "d5edb0bc-b45e-4e0d-a53f-7c429dfcda37",
+      "name": "Convert Hari"
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.message.from.id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2704,
+        1120
+      ],
+      "id": "cf7c90f3-15fb-4844-be4a-8bf193c154b7",
+      "name": "Gimmick Typing",
+      "webhookId": "1aa65031-a949-4dff-8088-dcb47ba0ed1f",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Telegramid": "",
+            "Nisn": "={{ $json.Nisn }}"
+          },
+          "matchingColumns": [
+            "Nisn"
+          ],
+          "schema": [
+            {
+              "id": "Telegramid",
+              "displayName": "Telegramid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Nisn",
+              "displayName": "Nisn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Password",
+              "displayName": "Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Kelas",
+              "displayName": "Kelas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -64,
+        2320
+      ],
+      "id": "99fc5dae-bcb7-4624-80e0-a527be226911",
+      "name": "Logout",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Alur Login ",
+        "height": 496,
+        "width": 1136
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3360,
+        1104
+      ],
+      "id": "0d727fcc-2e77-49a3-9a73-f090d9292b3b",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# Alur Daftar",
+        "height": 352,
+        "width": 1040
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2752,
+        1760
+      ],
+      "id": "cd21b790-3e96-454b-903e-7f4f17f2ea80",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+                    "rightValue": "/",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "baee60a7-635c-4f77-a474-d4ba0d2f3e40"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e18b500-2d76-425c-8fb6-325c5089955a",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2144,
+        1216
+      ],
+      "id": "58ee46da-2557-44cf-bf38-fc2b6ff6e571",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Kamu adalah \"Pak Ceria\", asisten akademik virtual yang ramah dan suportif untuk siswa SD.\n\nDATA SISWA:\nNama: {{ $('CheckIDTelegram').first().json.Nama }},Kelas :{{ $json.Kelas }}\nPertanyaan Siswa : {{ $('Telegram Trigger').item.json.message.text }}\n\nTUGAS KAMU:\n1. Temani siswa mengobrol santai, jawab pertanyaan umum, atau beri motivasi belajar.\n2. Jawablah dengan pendek, seru, dan gunakan emoji (maksimal 2-3 kalimat).\n3. Kalau Ada pertanyaan bagaiamana cara menggunakan bot selalu arahkan mereka untuk mengetik /help.\n\nATURAN KRUSIAL (JANGAN DILANGGAR):\nKamu TIDAK MEMILIKI AKSES LANGSUNG ke database nilai, jadwal, atau absensi di menu chat ini.\n- Jika siswa bertanya \"Berapa nilai saya?\", JANGAN MENGARANG NILAI.\n- Arahkan mereka dengan sopan: \"Wah, untuk melihat nilai, yuk ketik perintah /nilai ya!\"\n- Jika tanya jadwal: \"Cek jadwal pelajaran dengan ketik /jadwal ya nak.\"\n- Jika tanya absen: \"Ketik /presensi untuk cek kehadiranmu.\"/\n\n--\nIngat Fitur Hanya /Nilai,/Absensi,/Jadwal,/Analisis,/Formatif,/SumatifMateri,/SumatifSemester, /Help  \njangan suruh menggunakan fitur lain selain fitur di atas",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1872,
+        1344
+      ],
+      "id": "b3f3ae95-533e-49c1-9506-7b62d2c3c9d9",
+      "name": "AI Agent Chat"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4d84db41-a7ad-45a2-a79e-f688a070f473",
+              "leftValue": "={{ $json.Nisn }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "9824e751-bf12-4ed5-a55a-0b62aef8ea4b",
+              "leftValue": "={{ $json.Password }}",
+              "rightValue": "={{ $('Pemisah Nisn  dan Password').item.json.pass_input }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2304,
+        1888
+      ],
+      "id": "08ad4811-9d78-4b30-a256-6be9342f9715",
+      "name": "if Validasi Password"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "63d61ca6-a3a8-4d55-8eeb-1fab9f336b9b",
+              "leftValue": "={{ $json.row_number }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1872,
+        1760
+      ],
+      "id": "5c9e6ee1-feed-47f3-baf1-a34d1042f7ed",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "Nisn Atau Password Yang Kamu Masukan Salah",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2112,
+        2160
+      ],
+      "id": "95361584-e18c-480d-8aaa-167a1996e145",
+      "name": "Pass atau Nisn Salah",
+      "webhookId": "812440cd-742b-4f88-97bf-d6029141e500",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.Telegramid }}",
+        "text": "=Selamat Datang *{{ $('DataPengguna').item.json.Nama }}*\n\nPada Chatbot Telegram Laporan Hasil Akademik Siswa\nSilahkan Ketik Perintah Yang Telah Disediakan ",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Absensi",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1360,
+        1952
+      ],
+      "id": "37b62c86-4774-45fd-8788-ff6ad8dc727e",
+      "name": "Berhasil Daftar",
+      "webhookId": "92c7d454-1f0a-4e25-a087-9a37139b2a78",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ambil pesan dari Telegram Trigger\nconst msg = $('Telegram Trigger').first().json.message.text;\n\n// Cek format\nif (!msg.includes(\"#\")) {\n  return { json: { valid: false } };\n}\n\n// Pecah Pesan\nconst parts = msg.split(\"#\");\nconst nisn = parts[0].trim();\nconst pass = parts[1].trim();\n\n// Outputkan data bersih untuk dipakai node selanjutnya\nreturn {\n  json: {\n    valid: true,\n    nisn_input: nisn,\n    pass_input: pass\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2720,
+        1872
+      ],
+      "id": "f8bb8a18-ea27-42c8-962d-61186cc33aa4",
+      "name": "Pemisah Nisn  dan Password"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Telegramid",
+              "lookupValue": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2064,
+        1760
+      ],
+      "id": "03d948eb-2957-4817-bcb0-97c2d3c93d89",
+      "name": "Check Duplicate Telegram id",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Telegramid": "={{ \"\" }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Telegramid",
+              "displayName": "Telegramid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Nisn",
+              "displayName": "Nisn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Password",
+              "displayName": "Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Kelas",
+              "displayName": "Kelas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1664,
+        1744
+      ],
+      "id": "1a2b4a44-655b-4a21-9ad9-104352c5075c",
+      "name": "Hapus Duplicate Telegram id",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "DataPengguna",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('DataPengguna').item.json.row_number }}",
+            "Telegramid": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Telegramid",
+              "displayName": "Telegramid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Nisn",
+              "displayName": "Nisn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Password",
+              "displayName": "Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Kelas",
+              "displayName": "Kelas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1568,
+        1952
+      ],
+      "id": "829638f0-9d8a-48ea-afcf-265a604bfeed",
+      "name": "Update Telegram Id",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Kamu Belum Login Silahkan Masukan Nisn#Password Terlebih Dahulu ",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2240,
+        1456
+      ],
+      "id": "7f0cd2ab-b9eb-4904-838f-9d00ff0101e7",
+      "name": "Pemberitahuan Belum Login",
+      "webhookId": "3f2da239-8351-4b48-ac49-95330b52c4e1",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1520,
+        1520
+      ],
+      "id": "dd8ab1c7-a553-46eb-b1d8-d05bb247d649",
+      "name": "Balasan Ai Agent ",
+      "webhookId": "f93a32e0-54b4-4ace-80bc-eb3d52de3e3f",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Code in JavaScript24').item.json.chat_id }}",
+        "text": "={{ $json.output }}\nSalam Hangat \n-Pak Ceria \ud83d\ude0a",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Absensi",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        608
+      ],
+      "id": "c6d4ac6a-e4ec-49f7-a69a-4c5a39662881",
+      "name": "Send Hasil Analisis",
+      "webhookId": "eddc6df2-4768-4112-9610-828cdfa221bc",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('CheckIDTelegram').item.json.Telegramid }}",
+        "text": "={{ $json.text }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Sumatifmateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        1456
+      ],
+      "id": "db7a65e5-2127-46c1-8115-e82a3a6f1eca",
+      "name": "Send Absensi",
+      "webhookId": "ea073ce0-f17b-46c3-ad0f-b5c698e4bd6c",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramid }}",
+        "text": "={{ $json.text }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Absensi",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        1744
+      ],
+      "id": "e2919e9c-0d9d-4307-9905-966aa510ce98",
+      "name": "Send Jadwal",
+      "webhookId": "3188c826-bae9-4001-9b13-b3f8de797165",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('If').item.json.Telegramid }}",
+        "text": "=\ud83e\udd16 *PANDUAN SISTEM AKADEMIK*  Halo! Berikut adalah daftar perintah yang bisa digunakan:  \n\n1\ufe0f\u20e3 */Nilai* - Melihat transkrip nilai akademik.\n\n2\ufe0f\u20e3 */Absensi* - Mengecek rekap kehadiran (Sakit, Izin, Alpha).\n\n3\ufe0f\u20e3 */Jadwal* - Melihat jadwal pelajaran hari ini. _(Bisa juga ketik: /jadwal senin, /jadwal selasa, dst)_\n\n4\ufe0f\u20e3 */analisis* Meminta saran belajar otomatis dari AI berdasarkan nilai kamu.\n\n5\ufe0f\u20e3 */Formatif* Melihat Nilai Formatif Per Tp Kamu  \n\n  */SumatifMateri* Melihat Nilai Sumatif Akhir Materi Kamu\n\n  */SumatifSemester* Melihat Nilai Sumatif Akhir Semester Kamu\n\n\n_Jika ada kendala data, silakan hubungi Wali Kelas._",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisa",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Info",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        2080
+      ],
+      "id": "088d7623-9026-4516-a6e0-7fb8d5edb5bd",
+      "name": "Send Bantuan",
+      "webhookId": "177d1cfc-7071-47fd-bc22-82a7b2fe022f",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "=\ud83d\udd12 **LOGOUT BERHASIL**  \n\nAkun Telegram ini telah diputus dari sistem akademik. Anda tidak dapat lagi mengakses menu Nilai, Presensi, dan Jadwal.  \n\n_Untuk masuk kembali, silakan ketik /start dan daftar ulang._",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        2320
+      ],
+      "id": "ff45c81a-91fd-4deb-94ef-39a2a24387a6",
+      "name": "Send Pemberitahuan Logout",
+      "webhookId": "635ed389-d52a-4e80-bf4f-5ae9c848389a",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ebd33a38-2082-43ce-b0b5-e03a9caafce5",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/start",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3120,
+        1408
+      ],
+      "id": "4c029b5e-bc22-49b7-a7a3-d82bb14049e6",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Silahkan Masuk Dengan Format \n\nNiSN#Password\n\nUntuk Memulai Mengakses Data",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2736,
+        880
+      ],
+      "id": "94b38917-5fa9-49da-a693-3e8c52cf37a9",
+      "name": "Msg Awal",
+      "webhookId": "143fe415-7594-4e15-95b1-705cf5fde1e3",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.message.from.id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2960,
+        1856
+      ],
+      "id": "9c665d50-805b-4610-8dcb-7e6b4749c2ac",
+      "name": "Gimmick Typing1",
+      "webhookId": "1aa65031-a949-4dff-8088-dcb47ba0ed1f",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- 1. DATA LOGIN USER ---\nconst user = $('CheckIDTelegram').first().json;\n\nconst namaUser = user.Nama;\nconst nisnUser = user.Nisn;\nconst kelasUser = user.Kelas;\nconst telegramid = user.Telegramid;\n\n// --- 2. AMBIL DATA NILAI ---\nconst dataNilai = $('Ambil Nilai Akhir').all();\n\n// --- 3. AMBIL ABSENSI ---\nlet dataAbsensi = [];\ntry {\n  dataAbsensi = $('Ambil Absensi').all();\n} catch(e) {}\n\n// --- 4. LABEL MAPEL ---\nconst mapelLabel = {\n  \"Pendidikan Agama\": \"\u262a\ufe0f Agama\",\n  \"PPKN\": \"\ud83c\uddee\ud83c\udde9 PPKN\",\n  \"Bahasa Indonesia\": \"\ud83d\udde3\ufe0f Bahasa Indonesia\",\n  \"Matematika\": \"\ud83e\uddee Matematika\",\n  \"IPAS\": \"\ud83c\udf0d IPAS\",\n  \"Seni Rupa\": \"\ud83c\udfa8 Seni Rupa\",\n  \"PJOK\": \"\u26bd PJOK\",\n  \"Budaya Dan Sasra Minangkabau\": \"\ud83c\udfe0 Budaya Minangkabau\"\n};\n\nconst pemisah = \"\\n\u27a4 Nilai : \";\nconst jarakAntarMapel = \"\\n\\n\";\n\n// --- 5. SUSUN NILAI ---\nlet listNilai = \"\";\n\nfor (const item of dataNilai) {\n  const row = item.json;\n\n  if (!row.Nisn || row.Nisn !== nisnUser) continue;\n\n  const labelBaru = mapelLabel[row.Mapel] || row.Mapel;\n  listNilai += `*${labelBaru}*${pemisah}${row.Nilai}${jarakAntarMapel}`;\n}\n\n// --- 6. AMBIL ABSENSI ---\nlet sakit = \"-\", izin = \"-\", alpha = \"-\";\n\nif (dataAbsensi.length > 0) {\n  const absen = dataAbsensi[0].json;\n\n  sakit = absen.Sakit ?? \"-\";\n  izin = absen.Izin ?? \"-\";\n  alpha = absen.Alpha ?? \"-\";\n}\n\n// --- 7. SUSUN PESAN ---\nconst laporan = `\n\ud83c\udf93 *LAPORAN HASIL BELAJAR*\n\nNama :\n\ud83d\udc64 ${namaUser}\n\nNisn :\n\ud83c\udd94 ${nisnUser}\n\nKelas: ${kelasUser}\n---------------------------\n\ud83d\udcda *NILAI AKADEMIK*\n\n${listNilai.trim()}\n---------------------------\n\ud83d\udcc5 *KEHADIRAN*\n\n\ud83d\ude37 Sakit : ${sakit}\n\u2709\ufe0f Izin  : ${izin}\n\u274c Alpha : ${alpha}\n\n_Tetap semangat belajar!_ \u2728\n`;\n\nreturn [{\n  json: {\n    nisn: nisnUser,\n    nama: namaUser,\n    message: laporan.trim(),\n    telegramid\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        1120
+      ],
+      "id": "83ad4e64-547a-472d-aac3-3406b63e6468",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- 1. AMBIL DATA ---\nconst dataNilai = $('Nilai Formatif').all();\nconst dataTP = $('TujuanPembelajaran').all();\nlet telegramid = $('CheckIDTelegram').first().json.Telegramid;\n\n// --- 2. MAPING NAMA MAPEL ---\nconst mapelConfig = {\n  agama: \"Pendidikan Agama\",\n  ppkn: \"PPKN\",\n  bindo: \"Bahasa Indonesia\",\n  mtk: \"MATEMATIKA\",\n  ipas: \"IPAS\",\n  seni: \"Seni Rupa\",\n  pjok: \"PJOK\",\n  bsm: \"BSM\"\n};\n\n// --- 3. BUAT MAP TUJUAN PEMBELAJARAN ---\nconst tpMap = {};\n\nfor (const item of dataTP) {\n  const row = item.json;\n\n  const mapel = row.Mapel;\n  const tp = parseInt(row.Tp);\n  const desk = row.Deskripsi;\n\n  if (!tpMap[mapel]) tpMap[mapel] = {};\n  tpMap[mapel][tp] = desk;\n}\n\n// --- 4. KELOMPOKKAN NILAI PER MAPEL ---\nconst nilaiMap = {};\nlet nisnSiswa = \"-\";\nlet namaSiswa = \"Siswa\";\n\nfor (const item of dataNilai) {\n  const row = item.json;\n\n  nisnSiswa = row.Nisn || nisnSiswa;\n\n  const mapelKey = row.Mapel.toLowerCase();\n  const tp = parseInt(row.Tp);\n  const nilai = row.Nilai;\n\n  if (!nilaiMap[mapelKey]) nilaiMap[mapelKey] = [];\n  nilaiMap[mapelKey].push({ tp, nilai });\n}\n\n// --- 5. SUSUN LAPORAN ---\nlet laporanFull = \"\";\n\nfor (const [prefix, namaMapel] of Object.entries(mapelConfig)) {\n\n  const dataMapel = nilaiMap[prefix];\n  if (!dataMapel) continue;\n\n  dataMapel.sort((a, b) => a.tp - b.tp);\n\n  let buffer = \"\";\n\n  for (const item of dataMapel) {\n\n    let deskripsi = \"-\";\n\n    if (tpMap[namaMapel] && tpMap[namaMapel][item.tp]) {\n      deskripsi = tpMap[namaMapel][item.tp];\n    }\n\n    buffer +=\n      `Tp ${item.tp} : ${deskripsi}\\n\u27a4 Nilai : ${item.nilai}\\n\\n`;\n  }\n\n  laporanFull +=\n    `\ud83d\udcda *${namaMapel}*\\n------------------\\n${buffer}`;\n}\n\nif (!laporanFull) {\n  laporanFull = \"Belum ada data nilai formatif.\";\n}\n\nconst finalMessage = `\n\ud83d\udcdd *LAPORAN FORMATIF*\n\ud83c\udd94 NISN : ${nisnSiswa}\n========================\n\n${laporanFull.trim()}\n\n_Terus tingkatkan capaian belajarmu!_ \u2728\n`;\n\nconst MAX_LENGTH = 4000;\nconst pesanFinal = finalMessage.trim();\n\nconst results = [];\n\nfor (let i = 0; i < pesanFinal.length; i += MAX_LENGTH) {\n  results.push({\n    json: {\n      nisn: nisnSiswa,\n      message: pesanFinal.substring(i, i + MAX_LENGTH),\n      telegramid\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2624
+      ],
+      "id": "c50b91cb-00ec-44e2-a2b6-e440ba74ed54",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramid }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Absen",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {},
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        2608
+      ],
+      "id": "cff2c0f6-858e-4698-b16d-ec7b3c0abd45",
+      "name": "Send Formatif",
+      "webhookId": "41070290-377c-4b98-a3ce-ff990c200d6b",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramid }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Absensi",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {},
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        432,
+        3120
+      ],
+      "id": "fde1ce45-b83f-42ee-bdf5-bd1fc96b0bb8",
+      "name": "Send Sumatif semester",
+      "webhookId": "41070290-377c-4b98-a3ce-ff990c200d6b",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1107254519,
+          "mode": "list",
+          "cachedResultName": "RataRata_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas ? $json.Kelas.charAt(0).toUpperCase() + $json.Kelas.slice(1) : \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -480,
+        656
+      ],
+      "id": "2ef32744-f223-4b89-b4f5-e9ca98fee46c",
+      "name": "Rata Rata 1",
+      "retryOnFail": false,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- CONFIG NAMA NODE (SAMAKAN DENGAN WORKFLOW) ---\nconst namaNodeNilai = 'Ambil Nilai Akhir Ai ';\nconst namaNodeRata  = 'Rata Rata 1';\nconst namaNodeAbsen = 'Absensi Ai ';\n\nlet debugLog = [];\n\nlet dataNilai = [];\nlet dataRata2 = [];\nlet dataAbsen = {};\n\n// --- AMBIL NILAI SISWA ---\ntry {\n  dataNilai = $(namaNodeNilai).all().map(i => i.json);\n  if (!dataNilai.length) throw new Error(\"Output kosong\");\n} catch(e) {\n  debugLog.push(\"\u274c ERROR NILAI\");\n}\n\n// --- AMBIL RATA-RATA ---\ntry {\n  dataRata2 = $(namaNodeRata).all().map(i => i.json);\n  if (!dataRata2.length) throw new Error(\"Output kosong\");\n} catch(e) {\n  debugLog.push(\"\u274c ERROR RATA-RATA\");\n}\n\n// --- AMBIL ABSENSI ---\ntry {\n  dataAbsen = $(namaNodeAbsen).first().json;\n} catch(e) {\n  debugLog.push(\"\u274c ERROR ABSENSI\");\n}\n\n// --- JIKA ERROR ---\nif (debugLog.length > 0) {\n  return {\n    json: {\n      status: \"GAGAL\",\n      laporan_error: debugLog.join(\" | \")\n    }\n  };\n}\n\n// --- DATA LOGIN ---\nconst login = $('CheckIDTelegram').first().json;\nconst nama = login.Nama;\nconst nisn = login.Nisn;\n\n// --- GABUNG NILAI ---\nconst nilaiMap = {};\ndataNilai.forEach(row => {\n  nilaiMap[row.Mapel] = row.Nilai;\n});\n\n// --- GABUNG RATA-RATA ---\nconst rataMap = {};\ndataRata2.forEach(row => {\n  rataMap[row.Mapel] = row.RataRata || row.Nilai || 0;\n});\n\n// --- SUSUN PESAN ---\nlet pesan = `\ud83d\udcdd *LAPORAN HASIL BELAJAR*\\n`;\npesan += `\ud83d\udc64 Nama: ${nama}\\n`;\npesan += `\ud83c\udd94 NISN: ${nisn}\\n`;\npesan += `------------------------\\n`;\n\nObject.keys(nilaiMap).forEach(mapel => {\n\n  const nilaiSiswa = nilaiMap[mapel] || 0;\n  const nilaiRata = rataMap[mapel] || 0;\n\n  let icon = '';\n  if (nilaiSiswa > nilaiRata) icon = '\u2705';\n  if (nilaiSiswa < nilaiRata) icon = '\u26a0\ufe0f';\n\n  pesan += `\ud83d\udcda *${mapel}*: ${nilaiSiswa} _(Avg: ${nilaiRata})_ ${icon}\\n`;\n});\n\npesan += `------------------------\\n`;\npesan += `\ud83d\udcc5 *KEHADIRAN*\\n`;\npesan += `Sakit: ${dataAbsen.Sakit || 0} | `;\npesan += `Izin: ${dataAbsen.Izin || 0} | `;\npesan += `Alpha: ${dataAbsen.Alpha || 0}\\n`;\n\nreturn {\n  json: {\n    text_laporan: pesan,\n    chat_id: $('Telegram Trigger').first().json.message.chat.id\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        640
+      ],
+      "id": "a83042a3-6061-4dd4-b842-597c58fbac2b",
+      "name": "Code in JavaScript24"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        192,
+        800
+      ],
+      "id": "b840069e-d4a3-408b-a236-4c659b32afcb",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GEMINI_CRED_ID",
+          "name": "YOUR_GEMINI_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramid }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Absensi",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/SumatifMateri",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        1120
+      ],
+      "id": "5f457495-5fdb-4101-8880-86630a6a99c3",
+      "name": "Send Hasil Nilai",
+      "webhookId": "eddc6df2-4768-4112-9610-828cdfa221bc",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('CheckIDTelegram').item.json.Telegramid }}",
+        "text": "Check Kembali Perintah",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -976,
+        1744
+      ],
+      "id": "fc8d3557-98a0-46e0-aef9-ce7147747424",
+      "name": "Send a text message",
+      "webhookId": "9e45b167-c440-49ee-985e-b02aa7ea97ea",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 256536974,
+          "mode": "list",
+          "cachedResultName": "Absensi_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Nisn",
+              "lookupValue": "={{ $('CheckIDTelegram').item.json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        16,
+        1456
+      ],
+      "id": "b1e0767e-f36f-4b0f-8b56-097793b2a5be",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 551188395,
+          "mode": "list",
+          "cachedResultName": "NilaiAkhir_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Nisn",
+              "lookupValue": "={{ $('CheckIDTelegram').item.json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        1136
+      ],
+      "id": "77ace281-756b-4699-8fdc-44b823b52dfe",
+      "name": "Ambil Nilai Akhir",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 256536974,
+          "mode": "list",
+          "cachedResultName": "Absensi_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Nisn",
+              "lookupValue": "={{ $('CheckIDTelegram').item.json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -464,
+        1120
+      ],
+      "id": "af89296e-bf3e-443d-a3ff-1c4ca3f9bb19",
+      "name": "Ambil Absen Nilai",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1661053084,
+          "mode": "list",
+          "cachedResultName": "Jadwal_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas ? $json.Kelas.charAt(0).toUpperCase() + $json.Kelas.slice(1) : \"\" }}"
+            },
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas }}"
+            }
+          ]
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -160,
+        1744
+      ],
+      "id": "a9862d66-73f8-42f8-95eb-60e5a0480cce",
+      "name": "Ambil Jadwal",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 544517313,
+          "mode": "list",
+          "cachedResultName": "NilaiFormatif_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=Nisn",
+              "lookupValue": "={{ $json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        2608
+      ],
+      "id": "e7c530e9-e0de-42a2-a2fe-ca66c41ca4e6",
+      "name": "Nilai Formatif",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1411831161,
+          "mode": "list",
+          "cachedResultName": "TujuanPembelajaran_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas ? $json.Kelas.charAt(0).toUpperCase() + $json.Kelas.slice(1) : \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -48,
+        2608
+      ],
+      "id": "130cb067-75e8-40fa-b4a4-278b0993bc20",
+      "name": "TujuanPembelajaran",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- 1. AMBIL DATA ---\nconst dataNilai = $(\"Nilai Sumatif Materi\").all();\nconst dataTP = $('TujuanPembelajaran Materi').all();\nlet telegramid = $('CheckIDTelegram').first().json.Telegramid;\n\n// --- 2. MAPING MAPEL ---\nconst mapelConfig = {\n  agama: \"Pendidikan Agama\",\n  ppkn: \"PPKN\",\n  bindo: \"Bahasa Indonesia\",\n  mtk: \"MATEMATIKA\",\n  ipas: \"IPAS\",\n  seni: \"Seni Rupa\",\n  pjok: \"PJOK\",\n  bsm: \"BSM\"\n};\n\n// --- 3. BUAT KAMUS TP ---\nconst tpMap = {};\n\nfor (const item of dataTP) {\n  const row = item.json;\n\n  const mapel = row.Mapel;\n  const tp = parseInt(row.Tp);\n  const desk = row.Deskripsi;\n\n  if (!tpMap[mapel]) tpMap[mapel] = {};\n  tpMap[mapel][tp] = desk;\n}\n\n// --- 4. KELOMPOKKAN NILAI ---\nconst nilaiMap = {};\nlet nisnSiswa = \"-\";\n\nfor (const item of dataNilai) {\n  const row = item.json;\n\n  nisnSiswa = row.Nisn || nisnSiswa;\n\n  const mapelKey = row.Mapel.toLowerCase();\n  const tp = parseInt(row.Tp);\n  const nilai = row.Nilai;\n\n  if (!nilaiMap[mapelKey]) nilaiMap[mapelKey] = [];\n  nilaiMap[mapelKey].push({ tp, nilai });\n}\n\n// --- 5. SUSUN LAPORAN ---\nlet laporanFull = \"\";\n\nfor (const [prefix, namaMapel] of Object.entries(mapelConfig)) {\n\n  const dataMapel = nilaiMap[prefix];\n  if (!dataMapel) continue;\n\n  dataMapel.sort((a, b) => a.tp - b.tp);\n\n  let buffer = \"\";\n\n  for (const item of dataMapel) {\n\n    let deskripsi = \"-\";\n\n    if (tpMap[namaMapel] && tpMap[namaMapel][item.tp]) {\n      deskripsi = tpMap[namaMapel][item.tp];\n    }\n\n    buffer +=\n      `Tp ${item.tp} : ${deskripsi}\\n\u27a4 Nilai : ${item.nilai}\\n\\n`;\n  }\n\n  laporanFull +=\n    `\ud83d\udcda *${namaMapel}*\\n------------------\\n${buffer}`;\n}\n\nif (!laporanFull) {\n  laporanFull = \"Belum ada data nilai sumatif materi.\";\n}\n\nconst finalMessage = `\n\ud83d\udcd8 *LAPORAN SUMATIF MATERI*\n\ud83c\udd94 NISN : ${nisnSiswa}\n========================\n\n${laporanFull.trim()}\n\n_Terus tingkatkan capaian belajarmu!_ \u2728\n`;\n\nconst MAX_LENGTH = 4000;\nconst pesanFinal = finalMessage.trim();\n\nconst results = [];\n\nfor (let i = 0; i < pesanFinal.length; i += MAX_LENGTH) {\n  results.push({\n    json: {\n      nisn: nisnSiswa,\n      message: pesanFinal.substring(i, i + MAX_LENGTH),\n      telegramid\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2880
+      ],
+      "id": "11a50c48-99cc-4621-a01e-e8af5cd99173",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 211696515,
+          "mode": "list",
+          "cachedResultName": "NilaiSumatifMateri_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=Nisn",
+              "lookupValue": "={{ $json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        2864
+      ],
+      "id": "c96a8e8d-5a0a-4b2a-901b-dd650c3b3bdf",
+      "name": "Nilai Sumatif Materi",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1411831161,
+          "mode": "list",
+          "cachedResultName": "TujuanPembelajaran_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas ? $json.Kelas.charAt(0).toUpperCase() + $json.Kelas.slice(1) : \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -48,
+        2864
+      ],
+      "id": "739607f0-6b43-4c37-b830-d9120de0d65b",
+      "name": "TujuanPembelajaran Materi",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramid }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Analisis",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Nilai",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Jadwal",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/Absen",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Formatif",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "/SumatifSemester",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "/Help",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {},
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        2864
+      ],
+      "id": "2f26b489-26a7-4e88-89bc-e8a06cab7b53",
+      "name": "Send Sumatif Materi",
+      "webhookId": "41070290-377c-4b98-a3ce-ff990c200d6b",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- 1. AMBIL DATA ---\nconst dataNilai = $('Nilai Sumatif Materi1').all();\nconst dataTP = $('TujuanPembelajaran Semester').all();\nlet telegramid = $('CheckIDTelegram').first().json.Telegramid;\n\n// --- 2. MAPING MAPEL ---\nconst mapelConfig = {\n  agama: \"Pendidikan Agama\",\n  ppkn: \"PPKN\",\n  bindo: \"Bahasa Indonesia\",\n  mtk: \"MATEMATIKA\",\n  ipas: \"IPAS\",\n  seni: \"Seni Rupa\",\n  pjok: \"PJOK\",\n  bsm: \"BSM\"\n};\n\n// --- 3. BUAT KAMUS TP ---\nconst tpMap = {};\n\nfor (const item of dataTP) {\n  const row = item.json;\n\n  const mapel = row.Mapel;\n  const tp = parseInt(row.Tp);\n  const desk = row.Deskripsi;\n\n  if (!tpMap[mapel]) tpMap[mapel] = {};\n  tpMap[mapel][tp] = desk;\n}\n\n// --- 4. KELOMPOKKAN NILAI ---\nconst nilaiMap = {};\nlet nisnSiswa = \"-\";\n\nfor (const item of dataNilai) {\n  const row = item.json;\n\n  nisnSiswa = row.Nisn || nisnSiswa;\n\n  const mapelKey = row.Mapel.toLowerCase();\n  const tp = parseInt(row.Tp);\n  const nilai = row.Nilai;\n\n  if (!nilaiMap[mapelKey]) nilaiMap[mapelKey] = [];\n  nilaiMap[mapelKey].push({ tp, nilai });\n}\n\n// --- 5. SUSUN LAPORAN ---\nlet laporanFull = \"\";\n\nfor (const [prefix, namaMapel] of Object.entries(mapelConfig)) {\n\n  const dataMapel = nilaiMap[prefix];\n  if (!dataMapel) continue;\n\n  dataMapel.sort((a, b) => a.tp - b.tp);\n\n  let buffer = \"\";\n\n  for (const item of dataMapel) {\n\n    let deskripsi = \"-\";\n\n    if (tpMap[namaMapel] && tpMap[namaMapel][item.tp]) {\n      deskripsi = tpMap[namaMapel][item.tp];\n    }\n\n    buffer +=\n      `Tp ${item.tp} : ${deskripsi}\\n\u27a4 Nilai : ${item.nilai}\\n\\n`;\n  }\n\n  laporanFull +=\n    `\ud83d\udcda *${namaMapel}*\\n------------------\\n${buffer}`;\n}\n\nif (!laporanFull) {\n  laporanFull = \"Belum ada data nilai sumatif semester.\";\n}\n\nconst finalMessage = `\n\ud83d\udcd7 *LAPORAN SUMATIF SEMESTER*\n\ud83c\udd94 NISN : ${nisnSiswa}\n========================\n\n${laporanFull.trim()}\n\n_Terus tingkatkan capaian belajarmu!_ \u2728\n`;\n\nconst MAX_LENGTH = 4000;\nconst pesanFinal = finalMessage.trim();\n\nconst results = [];\n\nfor (let i = 0; i < pesanFinal.length; i += MAX_LENGTH) {\n  results.push({\n    json: {\n      nisn: nisnSiswa,\n      message: pesanFinal.substring(i, i + MAX_LENGTH),\n      telegramid\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        3104
+      ],
+      "id": "5f110e84-0084-49c3-a748-5808aa99ad1e",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 466869989,
+          "mode": "list",
+          "cachedResultName": "NilaiSumatifSemester_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=Nisn",
+              "lookupValue": "={{ $json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -208,
+        3136
+      ],
+      "id": "6894f8a6-f8d6-41be-87aa-c6c912623593",
+      "name": "Nilai Sumatif Materi1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1411831161,
+          "mode": "list",
+          "cachedResultName": "TujuanPembelajaran_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Kelas",
+              "lookupValue": "={{ $json.Kelas ? $json.Kelas.charAt(0).toUpperCase() + $json.Kelas.slice(1) : \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        16,
+        3136
+      ],
+      "id": "f5c4537e-99cd-4c24-abf4-46e5b8f6a2e7",
+      "name": "TujuanPembelajaran Semester",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 551188395,
+          "mode": "list",
+          "cachedResultName": "NilaiAkhir_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=Nisn",
+              "lookupValue": "={{ $json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -640,
+        656
+      ],
+      "id": "d31df21c-928c-4bc3-ba36-79fe285441a9",
+      "name": "Ambil Nilai Akhir Ai ",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Database_Akademik",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 256536974,
+          "mode": "list",
+          "cachedResultName": "Absensi_DB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=Nisn",
+              "lookupValue": "={{ $('CheckIDTelegram').item.json.Nisn }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        640
+      ],
+      "id": "81a46636-bf5a-4863-885b-7eab51ccca92",
+      "name": "Absensi Ai ",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "YOUR_GOOGLE_SHEETS_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1872,
+        1536
+      ],
+      "id": "5bc13737-d9a0-4cc2-abaa-5af00b697794",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GEMINI_CRED_ID",
+          "name": "YOUR_GEMINI_CREDENTIAL_NAME"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckIDTelegram": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pemberitahuan Belum Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Hasil Analisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert utk absensi": {
+      "main": [
+        [
+          {
+            "node": "Send Absensi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataPengguna": {
+      "main": [
+        [
+          {
+            "node": "if Validasi Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "CheckIDTelegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gimmick Typing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pemisah Nisn  dan Password",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gimmick Typing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterPerintah": {
+      "main": [
+        [
+          {
+            "node": "Ambil Nilai Akhir Ai ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ambil Absen Nilai",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ambil Jadwal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Send Bantuan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Logout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nilai Formatif",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nilai Sumatif Materi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nilai Sumatif Materi1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Hari": {
+      "main": [
+        [
+          {
+            "node": "Send Jadwal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logout": {
+      "main": [
+        [
+          {
+            "node": "Send Pemberitahuan Logout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "FilterPerintah",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent Chat": {
+      "main": [
+        [
+          {
+            "node": "Balasan Ai Agent ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if Validasi Password": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Telegram id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pass atau Nisn Salah",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Hapus Duplicate Telegram id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Telegram Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pemisah Nisn  dan Password": {
+      "main": [
+        [
+          {
+            "node": "DataPengguna",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Telegram id": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hapus Duplicate Telegram id": {
+      "main": [
+        [
+          {
+            "node": "Update Telegram Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Telegram Id": {
+      "main": [
+        [
+          {
+            "node": "Berhasil Daftar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Msg Awal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send Hasil Nilai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Send Formatif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rata Rata 1": {
+      "main": [
+        [
+          {
+            "node": "Absensi Ai ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript24": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Convert utk absensi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Nilai Akhir": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Absen Nilai": {
+      "main": [
+        [
+          {
+            "node": "Ambil Nilai Akhir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Jadwal": {
+      "main": [
+        [
+          {
+            "node": "Convert Hari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nilai Formatif": {
+      "main": [
+        [
+          {
+            "node": "TujuanPembelajaran",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TujuanPembelajaran": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send Sumatif Materi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nilai Sumatif Materi": {
+      "main": [
+        [
+          {
+            "node": "TujuanPembelajaran Materi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TujuanPembelajaran Materi": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nilai Sumatif Materi1": {
+      "main": [
+        [
+          {
+            "node": "TujuanPembelajaran Semester",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Send Sumatif semester",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TujuanPembelajaran Semester": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Nilai Akhir Ai ": {
+      "main": [
+        [
+          {
+            "node": "Rata Rata 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Absensi Ai ": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript24",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent Chat",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "YOUR_VERSION_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}
