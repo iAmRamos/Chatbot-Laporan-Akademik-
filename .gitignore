@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Environment variables — JANGAN upload ke GitHub
+.env
+
+# n8n data
+.n8n/
+
+# Ngrok
+ngrok.exe
+ngrok
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data siswa asli — JANGAN upload
+database/data-asli/
+*.xlsx
+*.csv
+
+# Logs
+*.log
