@@ -180,6 +180,7 @@ https://github.com/user-attachments/assets/demo.mp4
 ---
 
 ## 🗄️ Struktur Database (Google Sheets)
+https://drive.google.com/drive/folders/19RYgK7psEDqSWKbdhRdWoLyZxI_bWYUw?usp=drive_link
 
 | Sheet | Kolom Utama |
 |-------|-------------|
