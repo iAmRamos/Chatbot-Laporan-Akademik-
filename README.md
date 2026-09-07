@@ -143,13 +143,13 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
 chatbot-akademik-telegram/
 ├── workflow/
 │   └── chatbot-akademik.json    # Export workflow n8n
-├── database/
-│   └── template-sheets.md       # Struktur Google Sheets (template)
-├── docs/
-│   ├── arsitektur.md            # Dokumentasi arsitektur sistem
-│   ├── use-case-diagram.png     # Diagram UML
-│   └── screenshot/              # Screenshot tampilan chatbot
-├── docker-compose.yml           # Konfigurasi Docker n8n
+├── Doc/
+│   ├── demo.mp4                 # Video walkthrough demo interaktif
+│   ├── workflow-n8n.png         # Screenshot diagram workflow n8n
+│   ├── tampilan-awal.png        # Screenshot menu utama bot
+│   ├── fitur-laporan-akademik.png # Screenshot laporan nilai raport
+│   └── analisis-ai.png          # Screenshot analisis evaluasi AI
+├── docker-compose.yml           # Konfigurasi Docker n8n & Postgres
 ├── .env.example                 # Template environment variables
 ├── .gitignore
 └── README.md
@@ -157,15 +157,25 @@ chatbot-akademik-telegram/
 
 ---
 
-## 📸 Screenshot
+## 🎬 Demo Video & Alur Sistem
 
-| Tampilan Awal | Login | Menu Nilai |
-|---------------|-------|------------|
-| ![Awal](docs/screenshot/awal.png) | ![Login](docs/screenshot/login.png) | ![Nilai](docs/screenshot/nilai.png) |
+### 📹 Video Demo Chatbot
+> Klik video di bawah atau buka file [Doc/demo.mp4](Doc/demo.mp4) untuk melihat rekaman lengkap interaksi chatbot dan query nilai.
 
-| Absensi | Jadwal | Analisis AI |
-|---------|--------|-------------|
-| ![Absensi](docs/screenshot/absensi.png) | ![Jadwal](docs/screenshot/jadwal.png) | ![AI](docs/screenshot/ai.png) |
+https://github.com/user-attachments/assets/demo.mp4
+
+### 🔄 Workflow Otomasi (n8n)
+<p align="center">
+  <img src="Doc/workflow-n8n.png" alt="Workflow Otomasi n8n" width="850" />
+</p>
+
+---
+
+## 📸 Screenshot Tampilan Chatbot
+
+| Tampilan Menu Utama | Rekap Nilai Akademik | Analisis AI (Google Gemini) |
+| :---: | :---: | :---: |
+| <img src="Doc/tampilan-awal.png" alt="Tampilan Awal" width="260" /> | <img src="Doc/fitur-laporan-akademik.png" alt="Laporan Nilai" width="260" /> | <img src="Doc/analisis-ai.png" alt="Analisis AI" width="260" /> |
 
 ---
 
